@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>미국주식 분석기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+  :root{
+    --bg:#0a0e14;--panel:#11161f;--panel2:#161c27;--line:#1f2733;
+    --txt:#e8edf4;--dim:#7a8696;--green:#1ed760;--red:#ff4d5e;
+    --gold:#ffcb45;--blue:#4da6ff;--accent:#00e0c6;--purple:#b388ff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:radial-gradient(1200px 600px at 80% -10%,rgba(0,224,198,.08),transparent),
+    radial-gradient(900px 500px at -10% 110%,rgba(77,166,255,.07),transparent),var(--bg);
+    color:var(--txt);font-family:'Outfit',sans-serif;min-height:100vh;padding:20px 16px 60px;}
+  .wrap{max-width:520px;margin:0 auto;}
+  .ver{font-size:10px;color:#2a3442;text-align:center;margin-bottom:6px;}
+  .head{text-align:center;margin-bottom:24px;}
+  .head h1{font-size:26px;font-weight:800;letter-spacing:-.5px;
+    background:linear-gradient(90deg,var(--accent),var(--blue));
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .head p{color:var(--dim);font-size:12px;margin-top:4px;letter-spacing:1px;text-transform:uppercase;}
+  .search{display:flex;gap:10px;margin-bottom:8px;}
+  .search-wrap{position:relative;flex:1;}
+  .search-wrap input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    color:var(--txt);padding:16px 18px;font-size:17px;font-weight:600;}
+  .search-wrap input::placeholder{color:var(--dim);font-weight:400;}
+  .search button{background:linear-gradient(135deg,var(--accent),var(--blue));
+    border:none;border-radius:14px;color:#04121a;font-weight:800;font-size:16px;
+    padding:0 26px;cursor:pointer;}
+  .search button:disabled{opacity:.4;cursor:wait;}
+  #suggest{position:absolute;top:calc(100% + 6px);left:0;right:0;
+    background:var(--panel);border:1px solid var(--accent);border-radius:14px;
+    z-index:100;overflow:hidden;display:none;}
+  .sug-item{display:flex;justify-content:space-between;align-items:center;
+    padding:12px 16px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .sug-item:last-child{border-bottom:none;}
+  .sug-item:active{background:var(--panel2);}
+  .sug-ticker{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);}
+  .hint{font-size:11px;color:var(--dim);text-align:center;margin-bottom:16px;}
+  .quick{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px;}
+  .quick span{background:var(--panel);border:1px solid var(--line);border-radius:20px;
+    padding:6px 14px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--dim);cursor:pointer;}
+  .quick span:active{border-color:var(--accent);color:var(--accent);}
+  .msg{text-align:center;color:var(--dim);padding:40px 0;font-size:14px;line-height:2;}
+  .msg.err{color:var(--red);}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    margin-bottom:14px;overflow:hidden;animation:rise .4s ease both;}
+  @keyframes rise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  .price-card{padding:22px 20px;}
+  .ticker-name{font-size:13px;color:var(--dim);margin-bottom:2px;}
+  .ticker-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;}
+  .ticker{font-size:20px;font-weight:800;}
+  .live{font-size:10px;color:var(--green);display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(30,215,96,.5);}50%{opacity:.6;box-shadow:0 0 0 6px rgba(30,215,96,0);}}
+  .price{font-size:40px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-1px;}
+  .change{font-size:15px;font-weight:600;margin-top:2px;}
+  .up{color:var(--green);}.down{color:var(--red);}
+  .score-card{padding:20px;text-align:center;}
+  .score-label{font-size:12px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  .score-bar{height:10px;border-radius:5px;background:var(--line);margin:8px 0;overflow:hidden;}
+  .score-fill{height:100%;border-radius:5px;transition:width .6s ease;}
+  .score-num{font-size:32px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+  .score-desc{font-size:13px;margin-top:6px;}
+  .ind-grid{padding:18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ind{background:var(--panel2);border-radius:12px;padding:12px 14px;}
+  .ind .lbl{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .ind .val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .ind .sub{font-size:11px;color:var(--dim);margin-top:2px;}
+  .lvl-card{padding:18px 20px;display:flex;gap:12px;}
+  .lvl{flex:1;text-align:center;background:var(--panel2);border-radius:12px;padding:12px;}
+  .lvl .lbl{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .lvl .val{font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .lvl.sup .val{color:var(--blue);}.lvl.res .val{color:var(--gold);}
+  .outlook{border-radius:14px;margin-bottom:14px;padding:18px 20px;animation:rise .4s ease both;}
+  .outlook.bull{background:rgba(30,215,96,.08);border:1px solid rgba(30,215,96,.3);}
+  .outlook.bear{background:rgba(255,77,94,.08);border:1px solid rgba(255,77,94,.3);}
+  .outlook.neutral{background:rgba(255,203,69,.08);border:1px solid rgba(255,203,69,.3);}
+  .outlook-title{font-size:18px;font-weight:800;margin-bottom:8px;}
+  .outlook.bull .outlook-title{color:var(--green);}
+  .outlook.bear .outlook-title{color:var(--red);}
+  .outlook.neutral .outlook-title{color:var(--gold);}
+  .outlook-desc{font-size:13px;line-height:1.7;}
+  .plan-card{padding:0;}
+  .plan-tab{display:flex;align-items:center;gap:8px;padding:14px 20px;
+    font-size:13px;font-weight:800;border-bottom:1px solid var(--line);}
+  .plan-tab.day{color:var(--gold);}.plan-tab.swing{color:var(--accent);}
+  .plan-body{padding:16px 20px;}
+  .prow{display:flex;justify-content:space-between;align-items:center;
+    padding:9px 0;border-bottom:1px dashed var(--line);}
+  .prow:last-child{border-bottom:none;}
+  .prow .k{font-size:13px;color:var(--dim);}
+  .prow .v{font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .pct{font-size:12px;font-weight:600;margin-left:7px;}
+  .news-card{padding:18px 20px;}
+  .news-title{font-size:12px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;}
+  .news-item{padding:10px 0;border-bottom:1px dashed var(--line);}
+  .news-item:last-child{border-bottom:none;}
+  .news-item .nt{font-size:13px;line-height:1.5;color:var(--txt);}
+  .news-item .ns{font-size:11px;color:var(--dim);margin-top:4px;}
+  .disc{text-align:center;font-size:10px;color:#3a4452;margin-top:18px;line-height:1.5;}
+  .spin{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#04121a;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .progress{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:20px;text-align:center;margin-bottom:14px;}
+  .progress-bar{height:6px;background:var(--line);border-radius:3px;margin:12px 0;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--blue));
+    border-radius:3px;transition:width .3s ease;}
+  .progress-text{font-size:12px;color:var(--dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ver">US v7.0 · MAX</div>
+  <div class="head">
+    <h1>🇺🇸 미국주식 분석기</h1>
+    <p>RSI · MACD · 볼린저 · ATR · MA · 뉴스 · 전망</p>
+  </div>
+
+  <div class="search">
+    <div class="search-wrap">
+      <input id="ticker" placeholder="엔비디아 / NVDA" autocomplete="off">
+      <div id="suggest"></div>
+    </div>
+    <button id="go">분석</button>
+  </div>
+  <div class="hint">한글·영문 모두 입력 가능 🔍</div>
+
+  <div class="quick" id="quick">
+    <span>NVDA</span><span>AAPL</span><span>TSLA</span><span>MSFT</span>
+    <span>AMD</span><span>META</span><span>GOOGL</span><span>AMZN</span>
+    <span>PLTR</span><span>COIN</span><span>ARM</span><span>SMCI</span>
+  </div>
+
+  <div id="out"><div class="msg">티커를 입력하고 분석을 눌러주세요 📈</div></div>
+
+  <div class="disc">
+    Alpha Vantage · 무료플랜 (분당 5회 제한 — 분석에 1~2분 소요)<br>
+    투자 판단과 책임은 본인에게 있습니다.
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const AV='KJKC0HC0KUFHJHOI';
+let sym='';
+
+const STOCKS=[
+  {k:'엔비디아',t:'NVDA',n:'NVIDIA'},{k:'애플',t:'AAPL',n:'Apple'},
+  {k:'테슬라',t:'TSLA',n:'Tesla'},{k:'마이크로소프트',t:'MSFT',n:'Microsoft'},
+  {k:'구글',t:'GOOGL',n:'Alphabet'},{k:'알파벳',t:'GOOGL',n:'Alphabet'},
+  {k:'아마존',t:'AMZN',n:'Amazon'},{k:'메타',t:'META',n:'Meta'},
+  {k:'넷플릭스',t:'NFLX',n:'Netflix'},{k:'AMD',t:'AMD',n:'AMD'},
+  {k:'인텔',t:'INTC',n:'Intel'},{k:'팔란티어',t:'PLTR',n:'Palantir'},
+  {k:'마이크론',t:'MU',n:'Micron'},{k:'브로드컴',t:'AVGO',n:'Broadcom'},
+  {k:'TSMC',t:'TSM',n:'TSMC'},{k:'코인베이스',t:'COIN',n:'Coinbase'},
+  {k:'스타벅스',t:'SBUX',n:'Starbucks'},{k:'나이키',t:'NKE',n:'Nike'},
+  {k:'디즈니',t:'DIS',n:'Disney'},{k:'보잉',t:'BA',n:'Boeing'},
+  {k:'슈퍼마이크로',t:'SMCI',n:'Super Micro'},{k:'ARM',t:'ARM',n:'ARM Holdings'},
+  {k:'어도비',t:'ADBE',n:'Adobe'},{k:'우버',t:'UBER',n:'Uber'},
+  {k:'에어비앤비',t:'ABNB',n:'Airbnb'},{k:'퀄컴',t:'QCOM',n:'Qualcomm'},
+  {k:'오라클',t:'ORCL',n:'Oracle'},{k:'스냅',t:'SNAP',n:'Snap'},
+];
+
+function resolve(input){
+  const t=input.trim();
+  if(/^[A-Za-z.]+$/.test(t)){const up=t.toUpperCase();return STOCKS.find(s=>s.t===up)||{t:up,n:up,k:up};}
+  return STOCKS.find(s=>s.k===t)||STOCKS.find(s=>s.k.includes(t)||t.includes(s.k))||null;
+}
+
+function buildSuggest(val){
+  const box=$('suggest');box.innerHTML='';box.style.display='none';
+  if(!val) return;
+  const m=/^[A-Za-z]/.test(val)
+    ?STOCKS.filter(s=>s.t.startsWith(val.toUpperCase())||s.n.toLowerCase().startsWith(val.toLowerCase())).slice(0,6)
+    :STOCKS.filter(s=>s.k.includes(val)).slice(0,6);
+  if(!m.length) return;
+  m.forEach(s=>{
+    const d=document.createElement('div');d.className='sug-item';
+    d.innerHTML=`<span>${s.k}</span><span class="sug-ticker">${s.t}</span>`;
+    d.onclick=()=>{ $('ticker').value=s.k; box.style.display='none'; run(); };
+    box.appendChild(d);
+  });
+  box.style.display='block';
+}
+
+$('quick').addEventListener('click',e=>{ if(e.target.tagName==='SPAN'){ $('ticker').value=e.target.textContent; run(); } });
+$('go').onclick=run;
+$('ticker').addEventListener('input',e=>buildSuggest(e.target.value));
+$('ticker').addEventListener('keydown',e=>{ if(e.key==='Enter'){ $('suggest').style.display='none'; run(); } });
+
+function fmt(n,d=2){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+function setProgress(pct, text){
+  $('out').innerHTML=`
+    <div class="progress">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">📡 분석 중...</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-text">${text}</div>
+    </div>`;
+}
+
+async function avGet(fn,extra=''){
+  const r=await fetch(`https://www.alphavantage.co/query?function=${fn}&symbol=${sym}&apikey=${AV}${extra}`);
+  return r.json();
+}
+
+function analyzeOutlook(rsi,macd,bollPct,adx,stoch,ma20,ma50,price){
+  let bull=0,bear=0;
+  const signals=[];
+
+  if(rsi!=null){
+    if(rsi<30){bull+=3;signals.push('RSI 과매도('+fmt(rsi,0)+') 🟢');}
+    else if(rsi<45){bull+=1;signals.push('RSI 약세권('+fmt(rsi,0)+') 🟡');}
+    else if(rsi>70){bear+=3;signals.push('RSI 과매수('+fmt(rsi,0)+') 🔴');}
+    else if(rsi>55){bull+=1;signals.push('RSI 강세권('+fmt(rsi,0)+') 🟢');}
+    else signals.push('RSI 중립('+fmt(rsi,0)+') ⚪');
+  }
+  if(macd!=null){
+    if(macd>0){bull+=2;signals.push('MACD 양전환 🟢');}
+    else{bear+=2;signals.push('MACD 음전환 🔴');}
+  }
+  if(bollPct!=null){
+    if(bollPct<20){bull+=1;signals.push('볼린저 하단 반등구간 🟢');}
+    else if(bollPct>80){bear+=1;signals.push('볼린저 상단 과매수 🔴');}
+    else signals.push('볼린저 중심권 ⚪');
+  }
+  if(adx!=null){
+    if(adx>25){signals.push('ADX '+fmt(adx,0)+' 강한 추세 💪');}
+    else signals.push('ADX '+fmt(adx,0)+' 추세 약함');
+  }
+  if(stoch!=null){
+    if(stoch<20){bull+=1;signals.push('스토캐스틱 과매도 🟢');}
+    else if(stoch>80){bear+=1;signals.push('스토캐스틱 과매수 🔴');}
+  }
+  if(ma20!=null&&ma50!=null&&price!=null){
+    if(price>ma20&&price>ma50){bull+=1;signals.push('가격 MA20/50 위 🟢');}
+    else if(price<ma20&&price<ma50){bear+=1;signals.push('가격 MA20/50 아래 🔴');}
+  }
+
+  const total=bull+bear||1;
+  const score=Math.round((bull/total)*100);
+  let type,title,desc;
+  if(score>=65){type='bull';title='📈 상승 가능성 높음';}
+  else if(score<=35){type='bear';title='📉 하락 주의';}
+  else{type='neutral';title='➡️ 방향성 불확실';}
+  desc=signals.join(' · ');
+  return{type,title,desc,score};
+}
+
+async function run(){
+  const raw=$('ticker').value.trim();
+  const out=$('out');
+  if(!raw){out.innerHTML='<div class="msg err">종목명을 입력하세요</div>';return;}
+  const stock=resolve(raw);
+  if(!stock){out.innerHTML=`<div class="msg err">⚠️ "${raw}" 없음</div>`;return;}
+  sym=stock.t;
+  $('go').disabled=true;$('go').innerHTML='<span class="spin"></span>';
+
+  try{
+    setProgress(10,'현재가 조회 중...');
+    const qd=await avGet('GLOBAL_QUOTE');
+    const q=qd['Global Quote'];
+    if(!q||!q['05. price']) throw new Error('종목을 찾을 수 없습니다');
+    const price=parseFloat(q['05. price']);
+    const chg=parseFloat(q['09. change']);
+    const chgp=parseFloat(q['10. change percent']);
+    const hi=parseFloat(q['03. high']);
+    const lo=parseFloat(q['04. low']);
+    const prev=parseFloat(q['08. previous close']);
+    const pivot=(hi+lo+prev)/3;
+    const r1=2*pivot-lo, s1=2*pivot-hi;
+    const r2=pivot+(hi-lo), s2=pivot-(hi-lo);
+
+    await delay(1300);setProgress(25,'RSI 계산 중...');
+    let rsi=null;
+    try{const d=await avGet('RSI','&interval=daily&time_period=14&series_type=close');
+      const o=d['Technical Analysis: RSI'];if(o){const k=Object.keys(o)[0];rsi=parseFloat(o[k]['RSI']);}}catch(e){}
+
+    await delay(1300);setProgress(40,'MACD 계산 중...');
+    let macdHist=null;
+    try{const d=await avGet('MACD','&interval=daily&series_type=close');
+      const o=d['Technical Analysis: MACD'];if(o){const k=Object.keys(o)[0];macdHist=parseFloat(o[k]['MACD_Hist']);}}catch(e){}
+
+    await delay(1300);setProgress(55,'볼린저/ATR 계산 중...');
+    let bollPct=null,bollPos=null,atr=null;
+    try{const d=await avGet('BBANDS','&interval=daily&time_period=20&series_type=close');
+      const o=d['Technical Analysis: BBANDS'];if(o){const k=Object.keys(o)[0];
+        const up=parseFloat(o[k]['Real Upper Band']),lo2=parseFloat(o[k]['Real Lower Band']);
+        bollPct=((price-lo2)/(up-lo2))*100;
+        bollPos=bollPct>85?'상단돌파':bollPct>65?'상단근접':bollPct<15?'하단돌파':bollPct<35?'하단근접':'중심부근';}}catch(e){}
+    try{const d=await avGet('ATR','&interval=daily&time_period=14');
+      const o=d['Technical Analysis: ATR'];if(o){const k=Object.keys(o)[0];atr=parseFloat(o[k]['ATR']);}}catch(e){}
+
+    await delay(1300);setProgress(70,'이동평균/ADX 계산 중...');
+    let ma20=null,ma50=null,ma200=null,adx=null;
+    try{const d=await avGet('SMA','&interval=daily&time_period=20&series_type=close');
+      const o=d['Technical Analysis: SMA'];if(o){const k=Object.keys(o)[0];ma20=parseFloat(o[k]['SMA']);}}catch(e){}
+    try{const d=await avGet('SMA','&interval=daily&time_period=50&series_type=close');
+      const o=d['Technical Analysis: SMA'];if(o){const k=Object.keys(o)[0];ma50=parseFloat(o[k]['SMA']);}}catch(e){}
+    try{const d=await avGet('ADX','&interval=daily&time_period=14');
+      const o=d['Technical Analysis: ADX'];if(o){const k=Object.keys(o)[0];adx=parseFloat(o[k]['ADX']);}}catch(e){}
+
+    await delay(1300);setProgress(85,'스토캐스틱/뉴스 조회 중...');
+    let stoch=null;
+    try{const d=await avGet('STOCH','&interval=daily');
+      const o=d['Technical Analysis: STOCH'];if(o){const k=Object.keys(o)[0];stoch=parseFloat(o[k]['SlowK']);}}catch(e){}
+
+    let news=[];
+    try{const d=await avGet('NEWS_SENTIMENT','&limit=3');
+      if(d.feed) news=d.feed.slice(0,3).map(n=>({title:n.title,source:n.source,sentiment:n.overall_sentiment_label}));}catch(e){}
+
+    setProgress(100,'분석 완료!');
+    await delay(300);
+
+    // 목표가 ATR 기반
+    const atrMult=atr?atr:price*0.02;
+    const dB=price,dT1=price+atrMult*1.5,dT2=price+atrMult*2.5,dSL=price-atrMult*1.2;
+    const sB=price*0.995,sT1=price+atrMult*3,sT2=price+atrMult*5,sSL=price-atrMult*2;
+    const pt=(b,t)=>{const p=(t-b)/b*100;return `<span class="pct ${p>=0?'up':'down'}">${p>=0?'+':''}${fmt(p,1)}%</span>`;};
+
+    const outlook=analyzeOutlook(rsi,macdHist,bollPct,adx,stoch,ma20,ma50,price);
+    const scoreColor=outlook.score>=65?'var(--green)':outlook.score<=35?'var(--red)':'var(--gold)';
+
+    const newsHtml=news.length?news.map(n=>`
+      <div class="news-item">
+        <div class="nt">${n.title}</div>
+        <div class="ns">${n.source} · ${n.sentiment||''}</div>
+      </div>`).join(''):'<div class="news-item"><div class="nt" style="color:var(--dim)">뉴스 없음</div></div>';
+
+    out.innerHTML=`
+      <div class="card price-card">
+        <div class="ticker-name">${stock.n} 🇺🇸</div>
+        <div class="ticker-row"><div class="ticker">${stock.t}</div><div class="live"><span class="dot"></span>LIVE</div></div>
+        <div class="price">$${fmt(price)}</div>
+        <div class="change ${chg>=0?'up':'down'}">${chg>=0?'▲':'▼'} ${fmt(Math.abs(chg))} (${chg>=0?'+':''}${fmt(chgp,2)}%)</div>
+      </div>
+      <div class="card score-card">
+        <div class="score-label">종합 매수 강도</div>
+        <div class="score-num" style="color:${scoreColor}">${outlook.score}</div>
+        <div class="score-bar"><div class="score-fill" style="width:${outlook.score}%;background:${scoreColor}"></div></div>
+        <div class="score-desc" style="color:${scoreColor}">${outlook.title}</div>
+      </div>
+      <div class="outlook ${outlook.type}">
+        <div class="outlook-title">${outlook.title}</div>
+        <div class="outlook-desc">${outlook.desc}</div>
+      </div>
+      <div class="card ind-grid">
+        <div class="ind"><div class="lbl">RSI (14)</div><div class="val">${rsi!=null?fmt(rsi,1):'—'}</div><div class="sub">${rsi!=null?(rsi>70?'🔴 과매수':rsi<30?'🟢 과매도':'중립'):'—'}</div></div>
+        <div class="ind"><div class="lbl">MACD</div><div class="val" style="font-size:14px">${macdHist!=null?(macdHist>=0?'+':'')+fmt(macdHist,3):'—'}</div><div class="sub">${macdHist!=null?(macdHist>=0?'🟢 매수':'🔴 매도'):'—'}</div></div>
+        <div class="ind"><div class="lbl">볼린저</div><div class="val" style="font-size:13px">${bollPos||'—'}</div><div class="sub">${bollPct!=null?'밴드 '+fmt(bollPct,0)+'%':''}</div></div>
+        <div class="ind"><div class="lbl">ATR</div><div class="val" style="font-size:14px">${atr!=null?'$'+fmt(atr,2):'—'}</div><div class="sub">일간 변동폭</div></div>
+        <div class="ind"><div class="lbl">MA 20일</div><div class="val" style="font-size:14px">${ma20!=null?'$'+fmt(ma20):'—'}</div><div class="sub">${ma20!=null?(price>ma20?'🟢 위':'🔴 아래'):''}</div></div>
+        <div class="ind"><div class="lbl">MA 50일</div><div class="val" style="font-size:14px">${ma50!=null?'$'+fmt(ma50):'—'}</div><div class="sub">${ma50!=null?(price>ma50?'🟢 위':'🔴 아래'):''}</div></div>
+        <div class="ind"><div class="lbl">ADX</div><div class="val">${adx!=null?fmt(adx,1):'—'}</div><div class="sub">${adx!=null?(adx>25?'강한추세':'약한추세'):''}</div></div>
+        <div class="ind"><div class="lbl">스토캐스틱</div><div class="val">${stoch!=null?fmt(stoch,1):'—'}</div><div class="sub">${stoch!=null?(stoch>80?'🔴 과매수':stoch<20?'🟢 과매도':'중립'):''}</div></div>
+      </div>
+      <div class="card lvl-card">
+        <div class="lvl sup"><div class="lbl">지지 S1</div><div class="val">$${fmt(s1)}</div></div>
+        <div class="lvl"><div class="lbl">피봇</div><div class="val" style="color:var(--accent)">$${fmt(pivot)}</div></div>
+        <div class="lvl res"><div class="lbl">저항 R1</div><div class="val">$${fmt(r1)}</div></div>
+      </div>
+      <div class="card plan-card">
+        <div class="plan-tab day">🔥 단타 (오늘) · ATR 기반</div>
+        <div class="plan-body">
+          <div class="prow"><span class="k">매수</span><span class="v">$${fmt(dB)}</span></div>
+          <div class="prow"><span class="k">1차 목표</span><span class="v">$${fmt(dT1)}${pt(dB,dT1)}</span></div>
+          <div class="prow"><span class="k">2차 목표</span><span class="v">$${fmt(dT2)}${pt(dB,dT2)}</span></div>
+          <div class="prow"><span class="k">손절</span><span class="v">$${fmt(dSL)}${pt(dB,dSL)}</span></div>
+        </div>
+      </div>
+      <div class="card plan-card">
+        <div class="plan-tab swing">📈 스윙 (3~5일) · ATR 기반</div>
+        <div class="plan-body">
+          <div class="prow"><span class="k">매수</span><span class="v">$${fmt(sB)}</span></div>
+          <div class="prow"><span class="k">1차 목표</span><span class="v">$${fmt(sT1)}${pt(sB,sT1)}</span></div>
+          <div class="prow"><span class="k">2차 목표</span><span class="v">$${fmt(sT2)}${pt(sB,sT2)}</span></div>
+          <div class="prow"><span class="k">손절</span><span class="v">$${fmt(sSL)}${pt(sB,sSL)}</span></div>
+        </div>
+      </div>
+      <div class="card news-card">
+        <div class="news-title">📰 최신 뉴스</div>
+        ${newsHtml}
+      </div>`;
+  }catch(err){
+    out.innerHTML=`<div class="msg err">⚠️ ${err.message}</div>`;
+  }finally{
+    $('go').disabled=false;$('go').textContent='분석';
+  }
+}
+</script>
+</body>
+</html>
